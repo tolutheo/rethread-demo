@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rethread — AI operations, made accountable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0b0e14; --surface: #121722; --surface2: #1a2130; --border: #263042;
+    --text: #e8edf5; --muted: #8a95a8; --faint: #5b6577;
+    --amber: #f5a623; --amber-dim: rgba(245,166,35,.12); --amber-bd: rgba(245,166,35,.35);
+    --teal: #2dd4bf; --teal-dim: rgba(45,212,191,.1); --teal-bd: rgba(45,212,191,.35);
+    --rose: #fb7185; --rose-dim: rgba(251,113,133,.12);
+    --green: #34d399;
+    --r: 12px;
+    --accent: var(--teal); --accent-dim: var(--teal-dim); --accent-bd: var(--teal-bd);
+  }
+  body[data-theme="amber"] { --accent: var(--amber); --accent-dim: var(--amber-dim); --accent-bd: var(--amber-bd); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: var(--ink); color: var(--text); min-height: 100vh;
+    background-image: linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  h1,h2,h3,h4 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.3px; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .hidden { display: none !important; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #0b0e14; border: none; border-radius: 9px; padding: 11px 20px; font-size: 14px; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; transition: opacity .15s; }
+  .btn:hover { opacity: .88; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.sm { padding: 7px 14px; font-size: 12.5px; border-radius: 7px; }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+  .tag.ok { background: rgba(52,211,153,.14); color: var(--green); }
+  .tag.warn { background: var(--amber-dim); color: var(--amber); }
+  .tag.err { background: var(--rose-dim); color: var(--rose); }
+  .tag.info { background: var(--teal-dim); color: var(--teal); }
+
+  /* ============ LOGIN ============ */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 52px 46px; width: 400px; text-align: center; }
+  .wordmark { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .wordmark span { color: var(--teal); }
+  .ent-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 14px; padding: 4px 12px; margin-bottom: 30px; }
+  .login-card h1 { font-size: 21px; margin-bottom: 10px; }
+  .login-card p.sub { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin-bottom: 30px; }
+  .sso-btn { width: 100%; padding: 13px; font-size: 15px; justify-content: center; }
+  .login-foot { margin-top: 22px; font-size: 12px; color: var(--faint); }
+  .page-foot { position: fixed; bottom: 18px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--faint); }
+
+  /* ============ PROFILE CHOOSER ============ */
+  #chooser { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; }
+  #chooser h1 { font-size: 24px; margin-bottom: 8px; }
+  #chooser p.sub { color: var(--muted); font-size: 14px; margin-bottom: 38px; }
+  .profiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; max-width: 1020px; width: 100%; }
+  .profile-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 28px 24px; cursor: pointer; transition: border-color .15s, transform .12s; }
+  .profile-card:hover { transform: translateY(-3px); }
+  .profile-card.amber:hover { border-color: var(--amber); }
+  .profile-card.teal:hover { border-color: var(--teal); }
+  .profile-card .avatar { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 16px; }
+  .profile-card.amber .avatar { background: var(--amber-dim); }
+  .profile-card.teal .avatar { background: var(--teal-dim); }
+  .profile-card h3 { font-size: 16px; margin-bottom: 4px; }
+  .profile-card .who { font-size: 12.5px; margin-bottom: 12px; }
+  .profile-card.amber .who { color: var(--amber); }
+  .profile-card.teal .who { color: var(--teal); }
+  .profile-card p { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+  /* ============ APP SHELL ============ */
+  #shell { display: none; }
+  #shell.on { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  #shell.collapsed { grid-template-columns: 62px 1fr; }
+  aside { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+  .side-head { padding: 18px 18px 14px; display: flex; align-items: center; gap: 10px; }
+  .side-head .wordmark { font-size: 17px; white-space: nowrap; }
+  .persona-chip { margin: 0 14px 14px; padding: 10px 12px; border-radius: 10px; background: var(--accent-dim); border: 1px solid var(--accent-bd); font-size: 12px; white-space: nowrap; overflow: hidden; }
+  .persona-chip b { display: block; font-size: 12.5px; }
+  .persona-chip span { color: var(--muted); font-size: 11px; }
+  .nav-list { flex: 1; padding: 4px 10px; overflow-y: auto; }
+  .nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 8px; font-size: 13.5px; color: var(--muted); cursor: pointer; margin-bottom: 2px; white-space: nowrap; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--text); border-left: 3px solid var(--accent); padding-left: 9px; }
+  .nav-item .ic { width: 18px; text-align: center; flex-shrink: 0; }
+  .side-foot { padding: 10px; border-top: 1px solid var(--border); }
+  #shell.collapsed .side-head .wordmark, #shell.collapsed .persona-chip, #shell.collapsed .nav-item .lbl { display: none; }
+
+  .workspace { min-width: 0; }
+  .ws-header { display: flex; align-items: center; gap: 14px; padding: 12px 26px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 9; }
+  .ws-header .collapse { cursor: pointer; color: var(--muted); font-size: 16px; padding: 4px 8px; border-radius: 6px; }
+  .ws-header .collapse:hover { background: var(--surface2); }
+  .ws-search { flex: 1; max-width: 380px; position: relative; }
+  .ws-search input { width: 100%; padding: 9px 14px 9px 36px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit; }
+  .ws-search::before { content: '⌕'; position: absolute; left: 12px; top: 7px; color: var(--muted); font-size: 16px; }
+  .ws-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .bell { position: relative; cursor: pointer; font-size: 17px; color: var(--muted); }
+  .bell::after { content: '3'; position: absolute; top: -6px; right: -8px; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; border-radius: 50%; width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; }
+  .ws-user { font-size: 12.5px; color: var(--muted); }
+  .content { padding: 28px 26px 70px; max-width: 1240px; }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .page-head h2 { font-size: 22px; }
+  .page-head p { color: var(--muted); font-size: 13px; margin-top: 5px; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .filters select, .filters input { padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 12.5px; font-family: inherit; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; }
+  .kpi .lbl { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 8px; }
+  .kpi .val { font-family: 'IBM Plex Mono', monospace; font-size: 23px; font-weight: 600; letter-spacing: -0.5px; }
+  .kpi .val.accent { color: var(--accent); }
+  .kpi .val.rose { color: var(--rose); }
+  .kpi .val.green { color: var(--green); }
+  .kpi .delta { font-size: 11.5px; margin-top: 7px; color: var(--muted); }
+  .kpi .delta.up { color: var(--green); }
+  .kpi .delta.down { color: var(--rose); }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 22px; margin-bottom: 20px; }
+  .panel h3 { font-size: 14.5px; margin-bottom: 16px; }
+  .two-col { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+  @media (max-width: 900px){ .two-col { grid-template-columns: 1fr; } #shell.on { grid-template-columns: 62px 1fr; } .side-head .wordmark,.persona-chip,.nav-item .lbl{display:none} }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; padding: 9px 12px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  td { padding: 12px; border-bottom: 1px solid var(--border); }
+  tbody tr.link { cursor: pointer; }
+  tbody tr.link:hover { background: var(--surface2); }
+  td .mono { font-size: 12px; }
+
+  .bars { display: flex; align-items: flex-end; gap: 5px; height: 150px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%; position: relative; }
+  .bar-a { border-radius: 3px 3px 0 0; background: var(--accent); opacity: .85; }
+  .bar-b { border-radius: 0 0 3px 3px; background: var(--surface2); border: 1px solid var(--border); }
+  .hrow { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; }
+  .hrow .name { width: 150px; font-size: 12.5px; color: var(--muted); }
+  .htrack { flex: 1; height: 22px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+  .hfill { height: 100%; border-radius: 5px; display: flex; align-items: center; padding-left: 9px; font-size: 11px; font-weight: 600; color: #0b0e14; font-family: 'IBM Plex Mono', monospace; }
+  .legend { display: flex; gap: 18px; margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+  .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+
+  .alert-list .al { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; align-items: flex-start; }
+  .alert-list .al:last-child { border: none; }
+  .al .dot2 { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .al p { color: var(--muted); font-size: 12px; margin-top: 3px; line-height: 1.5; }
+  .al .when { margin-left: auto; font-size: 11px; color: var(--faint); white-space: nowrap; }
+  .rc-link { color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+  .toggle { position: relative; width: 38px; height: 21px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: var(--muted); transition: all .15s; }
+  .toggle.on { background: var(--accent-dim); border-color: var(--accent-bd); }
+  .toggle.on::after { left: 18px; background: var(--accent); }
+  .budget-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .budget-row:last-child { border: none; }
+  .budget-row .nm { flex: 1; font-size: 13.5px; }
+  .budget-row .nm span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .budget-row input[type=number] { width: 110px; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+  .agent-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 20px; cursor: pointer; transition: border-color .15s; }
+  .agent-card:hover { border-color: var(--accent); }
+  .agent-card h4 { font-size: 15px; margin-bottom: 4px; }
+  .agent-card .md { font-size: 11.5px; color: var(--muted); margin-bottom: 14px; }
+  .agent-card .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 4px 0; }
+  .agent-card .row b { color: var(--text); font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
+  .back-link { color: var(--accent); font-size: 13px; cursor: pointer; margin-bottom: 18px; display: inline-block; }
+
+  .timeline { border-left: 2px solid var(--border); margin: 6px 0 0 10px; padding-left: 26px; }
+  .t-step { position: relative; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 20px; }
+  .t-step::before { content: ''; position: absolute; left: -33px; top: 20px; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); border: 3px solid var(--ink); }
+  .t-step.warn::before { background: var(--rose); }
+  .t-step h4 { font-size: 13.5px; margin-bottom: 5px; }
+  .t-step p { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .t-step .meta { display: flex; gap: 16px; margin-top: 9px; font-size: 11px; color: var(--faint); font-family: 'IBM Plex Mono', monospace; flex-wrap: wrap; }
+
+  /* ============ wizard (ported from v1) ============ */
+  .steps { display: flex; gap: 8px; margin-bottom: 26px; }
+  .step-pill { flex: 1; text-align: center; padding: 9px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); }
+  .step-pill.on { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
+  .step-pill.done { border-color: var(--green); color: var(--green); }
+  .src-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 20px; cursor: pointer; position: relative; transition: border-color .15s; }
+  .src-card:hover { border-color: var(--accent); }
+  .src-card.selected { border-color: var(--green); background: rgba(52,211,153,.05); }
+  .src-card .icon { font-size: 24px; margin-bottom: 10px; }
+  .src-card h3 { font-size: 15px; margin-bottom: 5px; }
+  .src-card p { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+  .src-card .vol { font-size: 11.5px; color: var(--accent); font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+  .badge { position: absolute; top: 11px; right: 11px; background: var(--accent); color: #0b0e14; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; text-transform: uppercase; }
+  .badge.ok { background: var(--green); }
+  .compare { display: grid; grid-template-columns: 1fr 40px 1fr; align-items: stretch; }
+  .json-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; }
+  .json-panel .head { padding: 11px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .json-panel .head h4 { font-size: 12.5px; }
+  .json-panel .head .size { font-size: 12px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .size.raw { color: var(--rose); } .size.opt { color: var(--green); }
+  .json-panel pre { padding: 14px 16px; font-size: 10.8px; line-height: 1.55; font-family: 'IBM Plex Mono', monospace; color: #9aa5b8; overflow: auto; max-height: 330px; }
+  .json-panel pre .k { color: #7dd3fc; } .json-panel pre .s { color: var(--amber); } .json-panel pre .n { color: var(--teal); }
+  .arrow-col { display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--accent); }
+  .reduction-banner { text-align: center; margin: 16px 0 0; font-size: 15px; font-weight: 700; color: var(--green); font-family: 'Space Grotesk', sans-serif; }
+  .dest-row { display: flex; align-items: center; gap: 15px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 16px 20px; cursor: pointer; margin-bottom: 11px; }
+  .dest-row.locked { border-color: var(--accent-bd); background: var(--accent-dim); cursor: default; }
+  .dest-row.checked { border-color: var(--green); }
+  .dest-row .cb { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+  .dest-row.checked .cb { background: var(--green); border-color: var(--green); color: #06281c; font-weight: 800; }
+  .dest-row.locked .cb { background: var(--accent); border-color: var(--accent); color: #0b0e14; font-weight: 800; }
+  .dest-row .info { flex: 1; } .dest-row h4 { font-size: 14px; margin-bottom: 2px; }
+  .dest-row h4 .lock { font-size: 11px; color: var(--faint); margin-left: 8px; font-weight: 400; }
+  .dest-row p { font-size: 12px; color: var(--muted); }
+  .dest-row .cost { font-size: 12px; font-weight: 600; text-align: right; min-width: 170px; font-family: 'IBM Plex Mono', monospace; }
+  .cost .good { color: var(--green); } .cost .was { color: var(--faint); text-decoration: line-through; display: block; font-size: 11px; }
+  .wizard-actions { display: flex; justify-content: space-between; margin-top: 26px; }
+  .cards4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 14px; }
+
+  .toast { position: fixed; bottom: 22px; right: 22px; background: var(--surface); border: 1px solid var(--amber-bd); border-radius: 10px; padding: 13px 18px; font-size: 13px; z-index: 100; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  .conv-actions { display: flex; gap: 8px; }
+</style>
+</head>
+<body data-theme="teal">
+
+<!-- ============ LOGIN ============ -->
+<div id="login">
+  <div class="login-card">
+    <div class="wordmark">re<span>thread</span></div>
+    <div class="ent-badge">🛡 Enterprise secure</div>
+    <h1>Sign in to Rethread</h1>
+    <p class="sub">Use your organization account to enter the AI observability workspace.</p>
+    <button class="btn sso-btn" style="background:var(--teal)" onclick="toChooser()">Continue with SSO</button>
+    <div class="login-foot">Access is managed by your organization</div>
+  </div>
+  <div class="page-foot"><b>Rethread Systems</b> — AI operations, made accountable.</div>
+</div>
+
+<!-- ============ PROFILE CHOOSER ============ -->
+<div id="chooser" class="hidden">
+  <h1>Who's looking at the data today?</h1>
+  <p class="sub">Each profile gets a workspace shaped around what they need to decide.</p>
+  <div class="profiles">
+    <div class="profile-card amber" onclick="enterPersona('cx')">
+      <div class="avatar">🎧</div>
+      <h3>Customer Experience</h3>
+      <div class="who">Priya · CX Lead</div>
+      <p>How are our AI agents treating customers? Satisfaction, deflection, agent quality.</p>
+    </div>
+    <div class="profile-card amber" onclick="enterPersona('fin')">
+      <div class="avatar">📊</div>
+      <h3>Finance &amp; FinOps</h3>
+      <div class="who">Rohit · VP Finance</div>
+      <p>What does AI cost, where is it going, and what did Rethread save this month?</p>
+    </div>
+    <div class="profile-card teal" onclick="enterPersona('eng')">
+      <div class="avatar">🛠</div>
+      <h3>AI Platform Engineering</h3>
+      <div class="who">Sashank · Platform Lead</div>
+      <p>Sessions, traces, tool performance, ingestion pipelines, incidents.</p>
+    </div>
+    <div class="profile-card teal" onclick="enterPersona('ops')">
+      <div class="avatar">🎫</div>
+      <h3>Support Operations</h3>
+      <div class="who">Mei · Support Manager</div>
+      <p>Live conversations, escalations, tickets — with root causes one click away.</p>
+    </div>
+  </div>
+  <div class="page-foot"><b>Rethread Systems</b> — AI operations, made accountable.</div>
+</div>
+
+<!-- ============ SHELL ============ -->
+<div id="shell">
+  <aside>
+    <div class="side-head"><div class="wordmark" style="font-size:17px">re<span style="color:var(--accent)">thread</span></div></div>
+    <div class="persona-chip" id="persona-chip"></div>
+    <div class="nav-list" id="nav-list"></div>
+    <div class="side-foot">
+      <div class="nav-item" onclick="toast('Settings — demo stub')"><span class="ic">⚙</span><span class="lbl">Settings</span></div>
+      <div class="nav-item" onclick="toChooser()"><span class="ic">⇄</span><span class="lbl">Switch profile</span></div>
+    </div>
+  </aside>
+  <div class="workspace">
+    <div class="ws-header">
+      <span class="collapse" onclick="document.getElementById('shell').classList.toggle('collapsed')">☰</span>
+      <div class="ws-search"><input id="global-search" placeholder="Search…" oninput="globalFilter(this.value)"></div>
+      <div class="ws-right">
+        <span class="bell" onclick="toast('3 alerts — see dashboard alert feed')">🔔</span>
+        <span class="ws-user" id="ws-user"></span>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div id="toast-root"></div>
+
+<script>
+/* ================= state ================= */
+let persona = null, page = null, wizardSrc = null;
+const $ = id => document.getElementById(id);
+
+const PERSONAS = {
+  cx:  { name:"Priya", role:"CX Lead", label:"Customer Experience", theme:"amber",
+         nav:[["dashboard","▦","Dashboard"],["agents","🤖","Agents"],["reports","▤","Reports"]] },
+  fin: { name:"Rohit", role:"VP Finance", label:"Finance & FinOps", theme:"amber",
+         nav:[["dashboard","▦","Dashboard"],["costs","¤","Cost breakdown"],["budgets","◎","Budgets"],["exports","⇩","Reports & Exports"]] },
+  eng: { name:"Sashank", role:"Platform Lead", label:"AI Platform Engineering", theme:"teal",
+         nav:[["dashboard","▦","Dashboard"],["sessions","≋","Session Explorer"],["tools","⚒","Tool & Prompt Perf"],["ingest","⇅","Data & Integrations"],["incidents","⚠","Incidents"]] },
+  ops: { name:"Mei", role:"Support Manager", label:"Support Operations", theme:"teal",
+         nav:[["dashboard","▦","Dashboard"],["conversations","💬","Conversations"],["tickets","🎫","Tickets"]] },
+};
+
+/* ================= mock data ================= */
+const SESSIONS = [
+  ["7f3a","travel-booking-agent","claude-sonnet-4",4,"9,400","41s","warn","1 retry · completed"],
+  ["c21e","support-copilot","claude-haiku",12,"31,800","3m 12s","ok","completed"],
+  ["9d04","invoice-extractor","nova-pro",2,"4,100","8s","ok","completed"],
+  ["e8b7","support-copilot","claude-sonnet-4",27,"94,600","11m 3s","err","loop · abandoned"],
+  ["44f1","code-review-bot","claude-sonnet-4",6,"22,750","1m 44s","ok","completed"],
+  ["b3a9","travel-booking-agent","claude-sonnet-4",3,"6,900","29s","ok","completed"],
+  ["f07b","support-copilot","claude-haiku",9,"24,300","2m 30s","warn","truncated · completed"],
+];
+const AGENTS = [
+  {id:"support-copilot", team:"Support", model:"claude-haiku / sonnet-4", sess:"18,204", csat:"4.3 / 5", defl:"61%", esc:"9.2%", spend:"$4,120/wk", flag:"warn", note:"loop rate rising"},
+  {id:"travel-booking-agent", team:"Travel", model:"claude-sonnet-4", sess:"7,911", csat:"4.6 / 5", defl:"74%", esc:"4.1%", spend:"$2,240/wk", flag:"ok", note:"healthy"},
+  {id:"code-review-bot", team:"Eng Prod", model:"claude-sonnet-4", sess:"3,420", csat:"—", defl:"—", esc:"—", spend:"$1,290/wk", flag:"ok", note:"internal"},
+  {id:"invoice-extractor", team:"Finance Ops", model:"nova-pro", sess:"12,050", csat:"—", defl:"98%", esc:"0.4%", spend:"$540/wk", flag:"ok", note:"healthy"},
+];
+const CONVOS = [
+  {id:"cv-8812", agent:"support-copilot", user:"customer #4471", summary:"Refund status loop — agent repeated lookup_order 19×", status:"err", sess:"e8b7"},
+  {id:"cv-8807", agent:"support-copilot", user:"customer #9310", summary:"Password reset resolved in 3 turns", status:"ok", sess:"c21e"},
+  {id:"cv-8801", agent:"travel-booking-agent", user:"customer #2205", summary:"Flight rebooked, 1 tool retry", status:"warn", sess:"7f3a"},
+  {id:"cv-8797", agent:"support-copilot", user:"customer #7718", summary:"Response truncated mid-answer, customer re-asked", status:"warn", sess:"f07b"},
+];
+const INCIDENTS = [
+  {id:"INC-114", sev:"err", title:"support-copilot loop storm", body:"14 sessions flagged loop_suspected in 24h; 94k tokens burned in worst case.", when:"2h ago", sess:"e8b7"},
+  {id:"INC-113", sev:"warn", title:"Truncation spike on haiku", body:"Output truncation up 3.1× after prompt template change v41.", when:"9h ago", sess:"f07b"},
+  {id:"INC-110", sev:"ok", title:"Ingestion lag — resolved", body:"SQS backlog cleared after autoscale; no data loss.", when:"2d ago", sess:null},
+];
+
+/* ================= navigation ================= */
+function toChooser(){ $("login").classList.add("hidden"); $("shell").classList.remove("on"); $("chooser").classList.remove("hidden"); }
+function enterPersona(p){
+  persona = p;
+  const P = PERSONAS[p];
+  document.body.dataset.theme = P.theme;
+  $("chooser").classList.add("hidden"); $("shell").classList.add("on");
+  $("persona-chip").innerHTML = `<b>${P.label}</b><span>${P.name} · ${P.role}</span>`;
+  $("ws-user").textContent = `${P.name} · rethread.com`;
+  go("dashboard");
+}
+function go(pg){
+  page = pg;
+  const P = PERSONAS[persona];
+  $("nav-list").innerHTML = P.nav.map(([id,ic,lbl]) =>
+    `<div class="nav-item ${id===pg?'active':''}" onclick="go('${id}')"><span class="ic">${ic}</span><span class="lbl">${lbl}</span></div>`).join("");
+  $("global-search").value = "";
+  RENDER[persona][pg]();
+  window.scrollTo(0,0);
+}
+function toast(m){ const t=document.createElement("div"); t.className="toast"; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function globalFilter(q){
+  q=q.toLowerCase();
+  document.querySelectorAll("#content [data-filter]").forEach(el=>{
+    el.style.display = el.dataset.filter.toLowerCase().includes(q) ? "" : "none";
+  });
+}
+function head(t,s,extra=""){ return `<div class="page-head"><div><h2>${t}</h2><p>${s}</p></div>${extra}</div>`; }
+function kpi(lbl,val,cls,delta){ return `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${cls||''}">${val}</div>${delta?`<div class="delta ${delta[0]}">${delta[1]}</div>`:''}</div>`; }
+function volChart(n=30,ratio=.06){
+  let h="";
+  for(let i=0;i<n;i++){ const a=60+Math.sin(i/4)*16+((i*37)%13); h+=`<div class="bar-col"><div class="bar-b" style="height:${a}%"></div><div class="bar-a" style="height:${Math.max(a*ratio,3)}%"></div></div>`; }
+  return `<div class="bars">${h}</div><div class="legend"><span><span class="dot" style="background:var(--surface2);border:1px solid var(--border)"></span>Raw generated</span><span><span class="dot" style="background:var(--accent)"></span>Delivered downstream</span></div>`;
+}
+function hbars(rows){ return rows.map(r=>`<div class="hrow"><div class="name">${r[0]}</div><div class="htrack"><div class="hfill" style="width:${r[1]}%;background:${r[3]||'var(--accent)'}">${r[2]}</div></div></div>`).join(""); }
+function sessTable(rows){
+  return `<div class="panel" style="padding:0"><table><thead><tr><th>Session</th><th>Application</th><th>Model</th><th>Steps</th><th>Tokens</th><th>Duration</th><th>Outcome</th></tr></thead><tbody>${
+    rows.map(s=>`<tr class="link" data-filter="${s[0]} ${s[1]} ${s[2]} ${s[7]}" onclick="openSession('${s[0]}')"><td class="mono" style="color:var(--accent)">${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td><td>${s[3]}</td><td class="mono">${s[4]}</td><td>${s[5]}</td><td><span class="tag ${s[6]}">${s[7]}</span></td></tr>`).join("")
+  }</tbody></table></div>`;
+}
+function download(name, text){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"})); a.download=name; a.click();
+  toast(`Downloaded ${name} (mock data)`);
+}
+
+/* ================= session detail (shared) ================= */
+function openSession(id){
+  if(persona==="ops"||persona==="cx"){ document.body.dataset.theme="teal"; persona="eng"; enterPersonaSilently(); }
+  renderSessionDetail(id);
+}
+function enterPersonaSilently(){
+  const P=PERSONAS[persona];
+  $("persona-chip").innerHTML=`<b>${P.label}</b><span>${P.name} · ${P.role}</span>`;
+  $("ws-user").textContent=`${P.name} · rethread.com`;
+  $("nav-list").innerHTML=P.nav.map(([id,ic,lbl])=>`<div class="nav-item ${id==='sessions'?'active':''}" onclick="go('${id}')"><span class="ic">${ic}</span><span class="lbl">${lbl}</span></div>`).join("");
+}
+function renderSessionDetail(id){
+  $("content").innerHTML = `
+    <span class="back-link" onclick="go('sessions')">← Session Explorer</span>
+    ${head(`Session ${id} · travel-booking-agent`,`Flight rebooking · claude-sonnet-4 · 4 steps · 9,400 input tokens · 41s`)}
+    <div class="timeline">
+      <div class="t-step"><h4>Step 1 — Customer asks to rebook flight</h4><p>System prompt + 2 MB itinerary PDF attached. Both stored once, referenced by hash from here on. Customer PII tokenized to vault.</p><div class="meta"><span>tool: search_flights</span><span>2,150 tok in</span><span>blobs: S1, P1</span></div></div>
+      <div class="t-step"><h4>Step 2 — Agent searches flights, starts booking</h4><p>History re-sent by the app; PDF and prompt already exist — nothing stored twice. 15 KB tool result stored once.</p><div class="meta"><span>tool_result: search_flights</span><span>tool: book_flight</span><span>blobs: T1</span></div></div>
+      <div class="t-step warn"><h4>Step 3 — Booking fails, identical retry ⚠</h4><p>Same tool, same arguments, consecutive steps — flagged <b>loop_suspected</b>. Invisible in raw logs; visible here because the session is reconstructed.</p><div class="meta"><span>tool: book_flight (retry)</span><span>flag: loop_suspected</span></div></div>
+      <div class="t-step"><h4>Step 4 — Success, session complete ✓</h4><p>Outcome: completed. 4 steps, 2 tools, 1 retry, 41 seconds.</p><div class="meta"><span>stop: end_turn</span><span>outcome: completed</span></div></div>
+    </div>
+    <div class="panel"><h3>Ingestion impact</h3><p style="font-size:13px;color:var(--muted);line-height:1.7">Without Rethread the vendor ingests <b style="color:var(--rose)">~8.3 MB</b> for this session (PDF re-sent every call + growing history). Rethread delivered <b style="color:var(--green)">~10 KB of slim events</b> + 2 MB stored once in your bucket. <b>99.8% less ingestion, nothing lost.</b></p></div>`;
+}
+
+/* ================= renderers ================= */
+const RENDER = {
+
+/* ---------- Customer Experience (amber) ---------- */
+cx: {
+  dashboard(){ $("content").innerHTML =
+    head("Customer Experience","How AI agents treated customers in the last 7 days") +
+    `<div class="kpis">${kpi("CSAT (AI-handled)","4.4 / 5","accent",["up","▲ 0.2 vs last week"])}${kpi("Deflection rate","67%","",["up","▲ 3pts"])}${kpi("Escalations to human","6.8%","",["down","▲ 1.1pts — investigate"])}${kpi("Abandoned sessions","312","rose",["down","▲ 41 — mostly one agent"])}</div>` +
+    `<div class="two-col">
+      <div class="panel"><h3>Deflection by agent</h3>${hbars([["invoice-extractor",98,"98%"],["travel-booking",74,"74%"],["support-copilot",61,"61%","var(--rose)"]])}</div>
+      <div class="panel"><h3>Attention needed</h3><div class="alert-list">
+        <div class="al"><span class="dot2" style="background:var(--rose)"></span><div><b>support-copilot loop rate ×3</b><p>14 customers stuck in retry loops this week. <span class="rc-link" onclick="openSession('e8b7')">Worst session →</span></p></div><span class="when">2h</span></div>
+        <div class="al"><span class="dot2" style="background:var(--amber)"></span><div><b>Truncated answers spiking</b><p>Customers re-asking after cut-off replies on haiku.</p></div><span class="when">9h</span></div>
+        <div class="al"><span class="dot2" style="background:var(--green)"></span><div><b>Travel agent CSAT at 6-month high</b><p>4.6 after the tool-retry fix shipped.</p></div><span class="when">1d</span></div>
+      </div></div>
+    </div>`;
+  },
+  agents(){ $("content").innerHTML =
+    head("Agents","Every customer-facing AI agent, at a glance",`<div class="filters"><select onchange="globalFilter(this.value==='All teams'?'':this.value)"><option>All teams</option><option>Support</option><option>Travel</option><option>Finance Ops</option><option>Eng Prod</option></select></div>`) +
+    `<div class="cards-grid">${AGENTS.map(a=>`
+      <div class="agent-card" data-filter="${a.id} ${a.team}" onclick="RENDER.cx.agentDetail('${a.id}')">
+        <h4>${a.id}</h4><div class="md">${a.team} · ${a.model}</div>
+        <div class="row"><span>Sessions / wk</span><b>${a.sess}</b></div>
+        <div class="row"><span>CSAT</span><b>${a.csat}</b></div>
+        <div class="row"><span>Deflection</span><b>${a.defl}</b></div>
+        <div class="row"><span>Escalation</span><b>${a.esc}</b></div>
+        <div style="margin-top:12px"><span class="tag ${a.flag}">${a.note}</span></div>
+      </div>`).join("")}</div>`;
+  },
+  agentDetail(id){ const a=AGENTS.find(x=>x.id===id); $("content").innerHTML =
+    `<span class="back-link" onclick="go('agents')">← Agents</span>` +
+    head(a.id,`${a.team} · ${a.model}`) +
+    `<div class="kpis">${kpi("Sessions / wk",a.sess,"mono")}${kpi("CSAT",a.csat,"accent")}${kpi("Deflection",a.defl)}${kpi("Escalation",a.esc, a.flag==="warn"?"rose":"")}</div>
+     <div class="panel"><h3>Recent sessions from this agent</h3></div>` +
+    sessTable(SESSIONS.filter(s=>s[1]===id || id==="support-copilot" && s[1]==="support-copilot")) ;
+  },
+  reports(){ $("content").innerHTML =
+    head("Reports","Scheduled and on-demand CX reporting") +
+    `<div class="panel"><h3>Available reports</h3>
+      ${[["Weekly CX summary","CSAT, deflection, escalations by agent","cx-weekly.csv"],["Loop & failure digest","All flagged sessions with root-cause links","cx-loops.csv"],["Customer verbatims (PII-scrubbed)","Tokenized transcripts for QA review","cx-verbatims.csv"]].map(r=>`
+      <div class="budget-row"><div class="nm">${r[0]}<span>${r[1]}</span></div><button class="btn sm ghost" onclick="download('${r[2]}','report,generated\\n${r[0]},mock')">⇩ Download</button></div>`).join("")}
+    </div>`;
+  },
+},
+
+/* ---------- Finance & FinOps (amber) ---------- */
+fin: {
+  dashboard(){ $("content").innerHTML =
+    head("Finance & FinOps","AI spend and Rethread savings — September") +
+    `<div class="kpis">${kpi("Monthly savings","$61,400","green",["up","observability spend, vs pre-Rethread"])}${kpi("All-in AI observability","$10,600","mono",["","was $72,000/mo"])}${kpi("LLM spend (Bedrock)","$38,900","",["down","▼ 12% after loop fixes"])}${kpi("Data reduction","94%","accent",["","3 TB/day → 180 GB/day"])}</div>` +
+    `<div class="two-col">
+      <div class="panel"><h3>Monthly cost — before vs after Rethread</h3>${hbars([["Before",100,"$72,000","var(--rose)"],["After",15,"$10,600","var(--green)"]])}
+        <p style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6">After = Rethread fee $3,600 + compute $1,500 + S3 archive $2,000 + Datadog slim $3,600. You own 100% of the data.</p></div>
+      <div class="panel"><h3>Ingestion volume (30 days)</h3>${volChart()}</div>
+    </div>`;
+  },
+  costs(){ $("content").innerHTML =
+    head("Cost breakdown","Where AI spend goes, by application",`<div class="filters"><select><option>September 2026</option><option>August 2026</option></select></div>`) +
+    `<div class="panel" style="padding:0"><table><thead><tr><th>Application</th><th>LLM spend / wk</th><th>Share</th><th>Tokens / wk</th><th>Waste flagged</th><th>Trend</th></tr></thead><tbody>
+      ${[["support-copilot","$4,120","48%","168M","$310 (loop e8b7)","▲ rising","err"],["travel-booking-agent","$2,240","26%","37M","$0","▬ flat","ok"],["code-review-bot","$1,290","15%","22M","$45","▼ falling","ok"],["invoice-extractor","$540","6%","6.6M","$0","▬ flat","ok"],["other","$430","5%","4M","—","▬","ok"]].map(r=>`
+      <tr data-filter="${r[0]}"><td>${r[0]}</td><td class="mono">${r[1]}</td><td class="mono">${r[2]}</td><td class="mono">${r[3]}</td><td><span class="tag ${r[6]}">${r[4]}</span></td><td>${r[5]}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="panel"><h3>History re-send waste (what dedup makes visible)</h3>${hbars([["support-copilot",71,"71% of input tokens are re-sent history","var(--rose)"],["travel-booking",44,"44%"],["code-review-bot",29,"29%"]])}</div>`;
+  },
+  budgets(){ $("content").innerHTML =
+    head("Budgets","Locally editable — demo state only") +
+    `<div class="panel">${[["Monthly LLM budget","All applications",42000],["support-copilot cap","Weekly, alerts at 80%",5000],["Observability ingestion cap","Datadog slim feed",4000]].map((b,i)=>`
+      <div class="budget-row"><div class="nm">${b[0]}<span>${b[1]}</span></div><span class="mono" style="color:var(--muted)">$</span><input type="number" value="${b[2]}" onchange="toast('Budget updated (local demo state)')"><div class="toggle on" onclick="this.classList.toggle('on');toast('Alert '+(this.classList.contains('on')?'enabled':'disabled'))"></div></div>`).join("")}
+    <p style="font-size:11.5px;color:var(--faint);margin-top:14px">Toggles arm budget alerts. In production these page the owner via your existing alerting.</p></div>`;
+  },
+  exports(){ $("content").innerHTML =
+    head("Reports & Exports","Everything is queryable — these are shortcuts") +
+    `<div class="panel">${[["September cost allocation","Per-app, per-model, chargeback-ready","finops-sept.csv"],["Savings statement","Before/after evidence for procurement","savings-statement.csv"],["Token usage detail","Daily grain, 90 days","tokens-90d.csv"]].map(r=>`
+      <div class="budget-row"><div class="nm">${r[0]}<span>${r[1]}</span></div><button class="btn sm ghost" onclick="download('${r[2]}','metric,value\\n${r[0]},mock')">⇩ Export CSV</button></div>`).join("")}
+    </div>`;
+  },
+},
+
+/* ---------- AI Platform Engineering (teal) ---------- */
+eng: {
+  dashboard(){ $("content").innerHTML =
+    head("AI Platform Engineering","Pipeline health and session intelligence") +
+    `<div class="kpis">${kpi("Sessions reconstructed","41,203","accent",["","98.7% match confidence"])}${kpi("Ingestion lag","1.8s","green",["","p99, S3 event → slim event"])}${kpi("Loops caught","14","rose",["down","this week"])}${kpi("PII tokenized","12,882","",["","reversible, vaulted"])}</div>` +
+    `<div class="two-col">
+      <div class="panel"><h3>Raw vs delivered volume (30d)</h3>${volChart()}</div>
+      <div class="panel"><h3>Open incidents</h3><div class="alert-list">${INCIDENTS.map(i=>`
+        <div class="al"><span class="dot2" style="background:var(--${i.sev==='err'?'rose':i.sev==='warn'?'amber':'green'})"></span><div><b>${i.id} · ${i.title}</b><p>${i.body} ${i.sess?`<span class="rc-link" onclick="openSession('${i.sess}')">Session →</span>`:''}</p></div><span class="when">${i.when}</span></div>`).join("")}</div></div>
+    </div>`;
+  },
+  sessions(){ $("content").innerHTML =
+    head("Session Explorer","Every multi-step interaction, reconstructed. Search or click a row.",`<div class="filters"><select onchange="globalFilter(this.value.startsWith('All')?'':this.value)"><option>All outcomes</option><option>completed</option><option>loop</option><option>truncated</option></select></div>`) +
+    sessTable(SESSIONS);
+  },
+  tools(){ $("content").innerHTML =
+    head("Tool & Prompt Performance","Per-tool latency, failure and retry rates") +
+    `<div class="panel" style="padding:0"><table><thead><tr><th>Tool</th><th>Calls / wk</th><th>p95 latency</th><th>Failure rate</th><th>Identical retries</th><th>Status</th></tr></thead><tbody>
+    ${[["lookup_order","48,120","840ms","2.1%","19 in one session","err","degraded"],["search_flights","12,400","1.9s","0.8%","rare","ok","healthy"],["book_flight","9,850","2.4s","4.9%","elevated","warn","watch"],["extract_invoice","31,200","310ms","0.1%","none","ok","healthy"]].map(r=>`
+    <tr data-filter="${r[0]}"><td class="mono">${r[0]}</td><td class="mono">${r[1]}</td><td class="mono">${r[2]}</td><td class="mono">${r[3]}</td><td>${r[4]}</td><td><span class="tag ${r[5]}">${r[6]}</span></td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="panel"><h3>System prompt versions in the wild</h3><p style="font-size:12.5px;color:var(--muted);line-height:1.7">3 distinct system-prompt hashes active for support-copilot. v41 (deployed Tue) correlates with the truncation spike — INC-113. Because prompts are content-addressed, drift like this is detectable without reading a single transcript.</p></div>`;
+  },
+  ingest(){ renderWizard("connect"); },
+  incidents(){ $("content").innerHTML =
+    head("Incidents","Pipeline and agent-behavior incidents") +
+    `<div class="panel"><div class="alert-list">${INCIDENTS.map(i=>`
+      <div class="al" data-filter="${i.id} ${i.title}"><span class="dot2" style="background:var(--${i.sev==='err'?'rose':i.sev==='warn'?'amber':'green'})"></span><div><b>${i.id} · ${i.title}</b><p>${i.body} ${i.sess?`<span class="rc-link" onclick="openSession('${i.sess}')">Open session →</span>`:''}</p></div><span class="when">${i.when}</span></div>`).join("")}</div></div>`;
+  },
+},
+
+/* ---------- Support Operations (teal) ---------- */
+ops: {
+  dashboard(){ $("content").innerHTML =
+    head("Support Operations","Live AI-handled support, last 24h") +
+    `<div class="kpis">${kpi("Active conversations","218","accent")}${kpi("Escalated to human","31","",["down","▲ 8 vs yesterday"])}${kpi("Avg handle time","2m 41s","green")}${kpi("Stuck / looping now","3","rose",["","needs attention"])}</div>` +
+    `<div class="panel"><h3>Needs attention — root causes one click away</h3><div class="alert-list">
+      <div class="al"><span class="dot2" style="background:var(--rose)"></span><div><b>customer #4471 stuck in refund loop</b><p>support-copilot retried lookup_order 19×. <span class="rc-link" onclick="openSession('e8b7')">Root cause: session e8b7 →</span></p></div><span class="when">now</span></div>
+      <div class="al"><span class="dot2" style="background:var(--amber)"></span><div><b>Truncated answers causing re-asks</b><p>7 conversations today. <span class="rc-link" onclick="openSession('f07b')">Example session →</span></p></div><span class="when">1h</span></div>
+    </div></div>`;
+  },
+  conversations(){ $("content").innerHTML =
+    head("Conversations","AI-handled conversations with actions",`<div class="filters"><select onchange="globalFilter(this.value.startsWith('All')?'':this.value)"><option>All agents</option><option>support-copilot</option><option>travel-booking-agent</option></select></div>`) +
+    `<div class="panel" style="padding:0"><table><thead><tr><th>ID</th><th>Agent</th><th>Customer</th><th>Summary</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+    ${CONVOS.map(c=>`<tr data-filter="${c.id} ${c.agent} ${c.summary}"><td class="mono">${c.id}</td><td>${c.agent}</td><td>${c.user}</td><td style="max-width:280px">${c.summary}</td><td><span class="tag ${c.status}">${c.status==='ok'?'resolved':c.status==='warn'?'watch':'stuck'}</span></td>
+    <td><div class="conv-actions"><button class="btn sm ghost" onclick="openSession('${c.sess}')">Trace</button><button class="btn sm ghost" id="tk-${c.id}" onclick="makeTicket('${c.id}')">+ Ticket</button></div></td></tr>`).join("")}
+    </tbody></table></div>`;
+  },
+  tickets(){ $("content").innerHTML =
+    head("Tickets","Escalations created from conversations") +
+    `<div class="panel" style="padding:0"><table><thead><tr><th>Ticket</th><th>Source</th><th>Title</th><th>Assignee</th><th>Status</th></tr></thead><tbody>
+    ${[["TK-2041","cv-8812","Refund loop — support-copilot","platform-eng","err","open"],["TK-2038","cv-8797","Truncation after prompt v41","platform-eng","warn","in progress"],["TK-2029","cv-8790","Customer requested human callback","support-l2","ok","done"]].map(r=>`
+    <tr data-filter="${r[0]} ${r[2]}"><td class="mono">${r[0]}</td><td class="mono">${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td><span class="tag ${r[4]}">${r[5]}</span></td></tr>`).join("")}
+    </tbody></table></div>`;
+  },
+},
+};
+
+function makeTicket(id){
+  const b=$("tk-"+id); b.textContent="✓ TK-2042 created"; b.style.borderColor="var(--green)"; b.style.color="var(--green)"; b.onclick=null;
+  toast("Ticket TK-2042 created and linked to conversation "+id);
+}
+
+/* ================= wizard (our v1 work, consolidated) ================= */
+function renderWizard(stage){
+  const pills = s => `<div class="steps">
+    <div class="step-pill ${s==='connect'?'on':'done'}">1 · Connect${s!=='connect'?' ✓':''}</div>
+    <div class="step-pill ${s==='map'?'on':s==='deliver'?'done':''}">2 · Map${s==='deliver'?' ✓':''}</div>
+    <div class="step-pill ${s==='deliver'?'on':''}">3 · Deliver</div></div>`;
+  if(stage==="connect"){
+    $("content").innerHTML = head("Data & Integrations","Connect a source — one click, no credentials.") + pills("connect") +
+    `<div class="cards4">
+      ${[["bedrock","🟠","Amazon Bedrock","Model invocation logs, straight from the source.","~3.1 TB/day",true],["cloudwatch","🟣","CloudWatch Logs","Existing log groups, AI logs included.","~2.4 TB/day"],["datadog","🐶","Datadog","Optimize before it hits your bill.","~2.9 TB/day"],["dynatrace","🔷","Dynatrace","Keep dashboards, shrink ingestion.","~1.8 TB/day"]].map(s=>`
+      <div class="src-card ${wizardSrc===s[0]?'selected':''}" onclick="wizardSrc='${s[0]}';renderWizard('connect')">
+        ${s[5]&&wizardSrc!==s[0]?'<span class="badge">Recommended</span>':''}${wizardSrc===s[0]?'<span class="badge ok">Connected ✓</span>':''}
+        <div class="icon">${s[1]}</div><h3>${s[2]}</h3><p>${s[3]}</p><div class="vol">${s[4]} detected</div></div>`).join("")}
+    </div>
+    <div class="wizard-actions"><span></span><button class="btn" ${wizardSrc?'':'disabled style="opacity:.4"'} onclick="renderWizard('map')">Continue →</button></div>`;
+  }
+  if(stage==="map"){
+    $("content").innerHTML = head("Data & Integrations","The Standard Template — every AI log format, mapped automatically. This is the engine.") + pills("map") +
+    `<div class="compare">
+      <div class="json-panel"><div class="head"><h4>Raw Bedrock invocation log</h4><span class="size raw">87.4 KB</span></div>
+      <pre><span class="k">"timestamp"</span>: <span class="s">"2026-09-24T08:14:02Z"</span>,
+<span class="k">"identity"</span>: { <span class="k">"arn"</span>: <span class="s">"arn:aws:sts::1234…:assumed-role/travel-agent-prod"</span> },
+<span class="k">"modelId"</span>: <span class="s">"anthropic.claude-sonnet-4…"</span>,
+<span class="k">"input"</span>: { <span class="k">"inputBodyJson"</span>: {
+  <span class="k">"system"</span>: <span class="s">"[3.2 KB system prompt, re-sent EVERY call]"</span>,
+  <span class="k">"messages"</span>: [
+    { <span class="k">"document"</span>: { <span class="k">"name"</span>: <span class="s">"itinerary.pdf"</span>,
+      <span class="k">"bytes"</span>: <span class="s">"JVBERi0x… [2 MB base64, re-sent EVERY call]"</span> } },
+    { <span class="k">"role"</span>: <span class="s">"assistant"</span>, <span class="k">"content"</span>: <span class="s">"[full history, re-sent…]"</span> }
+  ] } },
+<span class="k">"output"</span>: { <span class="k">"usage"</span>: { <span class="k">"inputTokens"</span>: <span class="n">2150</span>, <span class="k">"outputTokens"</span>: <span class="n">184</span> },
+  <span class="k">"stopReason"</span>: <span class="s">"tool_use"</span>, <span class="k">"metrics"</span>: { <span class="k">"latencyMs"</span>: <span class="n">2841</span> } },
+<span class="k">"…plus"</span>: <span class="s">"k8s metadata, trace ctx, debug fields ×30"</span></pre></div>
+      <div class="arrow-col">➜</div>
+      <div class="json-panel"><div class="head"><h4>Optimized · Standard Template</h4><span class="size opt">2.1 KB</span></div>
+      <pre><span class="k">"session_id"</span>: <span class="s">"7f3a"</span>, <span class="k">"step_no"</span>: <span class="n">1</span>,
+<span class="k">"app_id"</span>: <span class="s">"travel-booking-agent"</span>,
+<span class="k">"model_id"</span>: <span class="s">"claude-sonnet-4"</span>,
+<span class="k">"identity"</span>: <span class="s">"role/travel-agent-prod"</span>,
+<span class="k">"ts"</span>: <span class="s">"2026-09-24T08:14:02Z"</span>, <span class="k">"latency_ms"</span>: <span class="n">2841</span>,
+<span class="k">"input_tokens"</span>: <span class="n">2150</span>, <span class="k">"output_tokens"</span>: <span class="n">184</span>,
+<span class="k">"stop_reason"</span>: <span class="s">"tool_use"</span>,
+<span class="k">"tool_calls"</span>: [{ <span class="k">"name"</span>: <span class="s">"search_flights"</span> }],
+<span class="k">"flags"</span>: [<span class="s">"pii_scrubbed"</span>],
+<span class="k">"prompt_hash"</span>: <span class="s">"sha256:a41d…"</span>
+
+<span style="color:#5b6577">// Full content stored ONCE in your bucket,</span>
+<span style="color:#5b6577">// retrievable by hash. Nothing lost.</span></pre></div>
+    </div>
+    <div class="reduction-banner">−97% per event · lossless — content stored once, referenced by hash</div>
+    <div class="wizard-actions"><button class="btn ghost" onclick="renderWizard('connect')">← Back</button><button class="btn" onclick="renderWizard('deliver')">Continue →</button></div>`;
+  }
+  if(stage==="deliver"){
+    $("content").innerHTML = head("Data & Integrations","Your data lands in your storage first. Add destinations on top.") + pills("deliver") +
+    `<div class="dest-row locked"><div class="cb">✓</div><div class="info"><h4>Rethread Data Platform <span class="lock">🔒 always on — this is what you own</span></h4><p>Lossless, session-structured, queryable archive in your own S3.</p></div><div class="cost"><span class="good">~$2,000/mo</span></div></div>
+    ${[["datadog","Datadog — slim feed","Dashboards and alerts unchanged.","<span class='was'>$72,000/mo today</span><span class='good'>~$3,600/mo</span>"],["dynatrace","Dynatrace — slim feed","Same slim feed, Dynatrace format.","<span class='good'>~$3,100/mo</span>"],["s3raw","Amazon S3 — raw archive","Untouched raw copy, for compliance.","<span class='good'>~$700/mo</span>"]].map(d=>`
+    <div class="dest-row" id="dst-${d[0]}" onclick="this.classList.toggle('checked')"><div class="cb"></div><div class="info"><h4>${d[1]}</h4><p>${d[2]}</p></div><div class="cost">${d[3]}</div></div>`).join("")}
+    <div class="wizard-actions"><button class="btn ghost" onclick="renderWizard('map')">← Back</button><button class="btn" onclick="toast('Pipeline built ⚡ — flowing in demo mode');setTimeout(()=>go('dashboard'),1200)">Build pipeline ⚡</button></div>`;
+  }
+}
+</script>
+</body>
+</html>
