@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rethread — AI Observability Data Platform</title>
+<style>
+  :root {
+    --bg: #0e1117; --panel: #161b24; --panel2: #1c2330; --border: #2a3342;
+    --text: #e6ebf2; --muted: #8b96a8; --accent: #4f8ef7; --accent2: #6ee7b7;
+    --green: #34d399; --red: #f87171; --amber: #fbbf24; --lock: #64748b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .hidden { display: none !important; }
+
+  /* ---------- Login ---------- */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 48px; width: 380px; text-align: center; }
+  .logo { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
+  .logo span { color: var(--accent); }
+  .login-card p.tag { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .login-card input { width: 100%; padding: 12px 14px; margin-bottom: 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+  .btn { display: inline-block; background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 12px 22px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+  .btn:hover { opacity: .88; }
+  .btn.full { width: 100%; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.big { padding: 15px 34px; font-size: 17px; }
+
+  /* ---------- App shell ---------- */
+  #app { display: none; }
+  nav { display: flex; align-items: center; gap: 28px; padding: 0 32px; height: 60px; background: var(--panel); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  nav .logo { font-size: 19px; margin: 0; margin-right: 18px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; padding: 6px 2px; border-bottom: 2px solid transparent; cursor: pointer; }
+  nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+  nav a.dead { opacity: .45; cursor: not-allowed; }
+  nav .spacer { flex: 1; }
+  nav .user { font-size: 13px; color: var(--muted); }
+  main { max-width: 1100px; margin: 0 auto; padding: 36px 24px 80px; }
+
+  /* ---------- Home ---------- */
+  .hero { text-align: center; padding: 60px 0 40px; }
+  .hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 14px; }
+  .hero p { font-size: 17px; color: var(--muted); max-width: 620px; margin: 0 auto 34px; line-height: 1.6; }
+  .banner { background: linear-gradient(90deg, rgba(52,211,153,.12), rgba(79,142,247,.12)); border: 1px solid rgba(52,211,153,.35); border-radius: var(--radius); padding: 18px 24px; margin: 40px auto 0; max-width: 640px; font-size: 16px; font-weight: 600; color: var(--accent2); }
+
+  /* ---------- Wizard ---------- */
+  .steps { display: flex; gap: 8px; margin-bottom: 34px; }
+  .step-pill { flex: 1; text-align: center; padding: 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--muted); }
+  .step-pill.on { border-color: var(--accent); color: var(--text); background: rgba(79,142,247,.1); }
+  .step-pill.done { border-color: var(--green); color: var(--green); }
+  h2.screen-title { font-size: 24px; font-weight: 750; margin-bottom: 8px; }
+  p.screen-sub { color: var(--muted); font-size: 15px; margin-bottom: 28px; line-height: 1.55; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+  .src-card { background: var(--panel); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 22px; cursor: pointer; position: relative; transition: border-color .15s, transform .1s; }
+  .src-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .src-card.selected { border-color: var(--green); background: rgba(52,211,153,.06); }
+  .src-card .icon { font-size: 28px; margin-bottom: 12px; }
+  .src-card h3 { font-size: 16px; margin-bottom: 6px; }
+  .src-card p { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .src-card .vol { font-size: 12px; color: var(--accent2); font-weight: 600; }
+  .badge { position: absolute; top: 12px; right: 12px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 20px; text-transform: uppercase; letter-spacing: .4px; }
+  .badge.ok { background: var(--green); color: #06281c; }
+  .wizard-actions { display: flex; justify-content: space-between; margin-top: 34px; }
+
+  /* ---------- Map screen ---------- */
+  .tmpl-bar { display: flex; gap: 12px; margin-bottom: 22px; }
+  .tmpl-choice { padding: 12px 20px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--panel); font-size: 14px; font-weight: 600; cursor: pointer; }
+  .tmpl-choice.selected { border-color: var(--accent); background: rgba(79,142,247,.1); }
+  .tmpl-choice.disabled { opacity: .45; cursor: not-allowed; }
+  .map-note { background: rgba(79,142,247,.08); border: 1px solid rgba(79,142,247,.3); border-radius: 8px; padding: 13px 18px; font-size: 14px; color: var(--text); margin-bottom: 22px; }
+  .compare { display: grid; grid-template-columns: 1fr 46px 1fr; gap: 0; align-items: stretch; }
+  .json-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .json-panel .head { padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .json-panel .head h4 { font-size: 13.5px; font-weight: 700; }
+  .json-panel .head .size { font-size: 12.5px; font-weight: 700; }
+  .size.raw { color: var(--red); }
+  .size.opt { color: var(--green); }
+  .json-panel pre { padding: 16px 18px; font-size: 11.2px; line-height: 1.55; font-family: 'SF Mono', Menlo, Consolas, monospace; color: #a8b3c5; overflow: auto; max-height: 380px; flex: 1; }
+  .json-panel pre .k { color: #7dd3fc; }
+  .json-panel pre .s { color: #fbbf24; }
+  .json-panel pre .n { color: #6ee7b7; }
+  .arrow-col { display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--accent); }
+  .reduction-banner { text-align: center; margin: 18px 0 0; font-size: 17px; font-weight: 800; color: var(--green); }
+
+  /* ---------- Deliver ---------- */
+  .dest-list { display: flex; flex-direction: column; gap: 12px; }
+  .dest-row { display: flex; align-items: center; gap: 16px; background: var(--panel); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 18px 22px; cursor: pointer; }
+  .dest-row.locked { border-color: var(--accent); background: rgba(79,142,247,.07); cursor: default; }
+  .dest-row.checked { border-color: var(--green); }
+  .dest-row .cb { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .dest-row.checked .cb, .dest-row.locked .cb { background: var(--green); border-color: var(--green); color: #06281c; font-weight: 800; }
+  .dest-row.locked .cb { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .dest-row .info { flex: 1; }
+  .dest-row h4 { font-size: 15px; margin-bottom: 3px; }
+  .dest-row h4 .lock { font-size: 12px; color: var(--lock); margin-left: 8px; font-weight: 500; }
+  .dest-row p { font-size: 13px; color: var(--muted); }
+  .dest-row .cost { font-size: 12.5px; font-weight: 700; text-align: right; min-width: 200px; }
+  .cost .good { color: var(--green); }
+  .cost .was { color: var(--muted); text-decoration: line-through; font-weight: 500; display: block; font-size: 11.5px; }
+
+  /* ---------- Build progress ---------- */
+  #building { text-align: center; padding: 90px 0; }
+  .progress-track { width: 420px; height: 10px; background: var(--panel2); border-radius: 6px; margin: 28px auto; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 6px; transition: width .5s ease; }
+  #build-status { color: var(--muted); font-size: 14px; min-height: 20px; }
+  .success-check { font-size: 56px; margin-bottom: 18px; }
+
+  /* ---------- Dashboard ---------- */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
+  .stat .label { font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .stat .value { font-size: 27px; font-weight: 800; letter-spacing: -0.5px; }
+  .stat .sub { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .stat .value.green { color: var(--green); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+  .panel h3 { font-size: 15.5px; margin-bottom: 18px; }
+  .chart-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 24px; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+  .bar-pair { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%; }
+  .bar-raw { background: rgba(248,113,113,.55); border-radius: 3px 3px 0 0; }
+  .bar-opt { background: var(--green); border-radius: 0 0 3px 3px; }
+  .legend { display: flex; gap: 20px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+  .hbar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .hbar-row .name { width: 130px; font-size: 13px; color: var(--muted); }
+  .hbar-track { flex: 1; height: 26px; background: var(--panel2); border-radius: 6px; overflow: hidden; }
+  .hbar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; font-size: 12px; font-weight: 700; color: #06281c; }
+
+  /* ---------- Ask your data ---------- */
+  .ask-box { display: flex; gap: 10px; margin-bottom: 16px; }
+  .ask-box input { flex: 1; padding: 13px 16px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .chip { padding: 8px 15px; border-radius: 20px; border: 1px solid var(--border); background: var(--panel2); font-size: 13px; color: var(--text); cursor: pointer; transition: border-color .15s; }
+  .chip:hover { border-color: var(--accent); }
+  .answer { margin-top: 18px; padding: 18px; background: var(--panel2); border-radius: 10px; border-left: 3px solid var(--accent); font-size: 14px; line-height: 1.65; }
+  .answer .mini-bars { display: flex; align-items: flex-end; gap: 10px; height: 90px; margin-top: 14px; }
+  .answer .mini-bars .mb { background: var(--accent); border-radius: 4px 4px 0 0; width: 54px; position: relative; }
+  .answer .mini-bars .mb span { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .answer .mini-bars .mb em { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--muted); font-style: normal; white-space: nowrap; }
+
+  /* ---------- Sessions ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  td { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--panel2); }
+  .flag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+  .flag.ok { background: rgba(52,211,153,.15); color: var(--green); }
+  .flag.warn { background: rgba(251,191,36,.15); color: var(--amber); }
+  .flag.err { background: rgba(248,113,113,.15); color: var(--red); }
+
+  /* ---------- Session detail / timeline ---------- */
+  .back-link { color: var(--accent); font-size: 13.5px; cursor: pointer; margin-bottom: 20px; display: inline-block; }
+  .timeline { border-left: 2px solid var(--border); margin-left: 12px; padding-left: 28px; }
+  .t-step { position: relative; margin-bottom: 26px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; }
+  .t-step::before { content: ''; position: absolute; left: -35px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); }
+  .t-step.warn::before { background: var(--amber); }
+  .t-step h4 { font-size: 14.5px; margin-bottom: 6px; }
+  .t-step p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .t-step .meta { display: flex; gap: 18px; margin-top: 10px; font-size: 12px; color: var(--muted); font-family: 'SF Mono', Menlo, monospace; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel); border: 1px solid var(--amber); border-radius: 10px; padding: 14px 20px; font-size: 13.5px; z-index: 100; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login">
+  <div class="login-card">
+    <div class="logo">re<span>thread</span></div>
+    <p class="tag">AI Observability Data Platform</p>
+    <input type="text" placeholder="Email" value="rohit@rethread.com">
+    <input type="password" placeholder="Password" value="••••••••••">
+    <button class="btn full" onclick="enterApp()">Sign in</button>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <nav>
+    <div class="logo">re<span style="color:var(--accent)">thread</span></div>
+    <a id="nav-home" class="active" onclick="show('home')">Pipelines</a>
+    <a id="nav-dash" onclick="guardDash()">Dashboard</a>
+    <a id="nav-sess" onclick="guardSess()">Sessions</a>
+    <a class="dead" onclick="toast('Settings — coming soon')">Settings</a>
+    <div class="spacer"></div>
+    <div class="user">Acme Corp · Rohit</div>
+  </nav>
+
+  <main>
+    <!-- ============ HOME ============ -->
+    <section id="home">
+      <div class="hero">
+        <h1>Your AI logs, 94% smaller.<br>Still yours. Still complete.</h1>
+        <p>Connect your AI logs. We optimize them. You keep the data. You pick who sees it. No agents to install, no code changes, no API keys to manage.</p>
+        <button class="btn big" onclick="startWizard()">Set up a pipeline →</button>
+        <div class="banner">💰 Customers save 60–85% on observability ingestion costs</div>
+      </div>
+    </section>
+
+    <!-- ============ WIZARD: CONNECT ============ -->
+    <section id="connect" class="hidden">
+      <div class="steps">
+        <div class="step-pill on">1 · Connect</div>
+        <div class="step-pill">2 · Map</div>
+        <div class="step-pill">3 · Deliver</div>
+      </div>
+      <h2 class="screen-title">Where do your AI logs live today?</h2>
+      <p class="screen-sub">Pick a source. We detected these in your environment — one click connects it. No credentials needed.</p>
+      <div class="cards">
+        <div class="src-card" id="src-bedrock" onclick="selectSource('bedrock')">
+          <span class="badge">Recommended</span>
+          <div class="icon">🟠</div>
+          <h3>Amazon Bedrock</h3>
+          <p>Model invocation logs, straight from the source. Richest data, lowest cost.</p>
+          <div class="vol">~3.1 TB/day detected</div>
+        </div>
+        <div class="src-card" id="src-cloudwatch" onclick="selectSource('cloudwatch')">
+          <div class="icon">🟣</div>
+          <h3>CloudWatch Logs</h3>
+          <p>Your existing log groups, including AI logs already flowing there.</p>
+          <div class="vol">~2.4 TB/day detected</div>
+        </div>
+        <div class="src-card" id="src-datadog" onclick="selectSource('datadog')">
+          <div class="icon">🐶</div>
+          <h3>Datadog</h3>
+          <p>Optimize what you already send to Datadog — before it hits your bill.</p>
+          <div class="vol">~2.9 TB/day detected</div>
+        </div>
+        <div class="src-card" id="src-dynatrace" onclick="selectSource('dynatrace')">
+          <div class="icon">🔷</div>
+          <h3>Dynatrace</h3>
+          <p>Same for Dynatrace — keep dashboards, shrink ingestion.</p>
+          <div class="vol">~1.8 TB/day detected</div>
+        </div>
+      </div>
+      <div class="wizard-actions">
+        <button class="btn ghost" onclick="show('home')">← Back</button>
+        <button class="btn" id="connect-next" disabled style="opacity:.4" onclick="show('map')">Continue →</button>
+      </div>
+    </section>
+
+    <!-- ============ WIZARD: MAP ============ -->
+    <section id="map" class="hidden">
+      <div class="steps">
+        <div class="step-pill done">1 · Connect ✓</div>
+        <div class="step-pill on">2 · Map</div>
+        <div class="step-pill">3 · Deliver</div>
+      </div>
+      <h2 class="screen-title">How should we structure your data?</h2>
+      <p class="screen-sub">The Standard Template understands every AI log format automatically — this is the engine of the product. Here it is working on one of your real events.</p>
+      <div class="tmpl-bar">
+        <div class="tmpl-choice selected">⭐ Standard Template</div>
+        <div class="tmpl-choice disabled" onclick="toast('Custom templates — available on the Growth plan')">+ Create custom template</div>
+      </div>
+      <div class="compare">
+        <div class="json-panel">
+          <div class="head"><h4>Raw Bedrock invocation log</h4><span class="size raw">87.4 KB</span></div>
+          <pre id="raw-json"></pre>
+        </div>
+        <div class="arrow-col">➜</div>
+        <div class="json-panel">
+          <div class="head"><h4>Optimized · Standard Template</h4><span class="size opt">2.1 KB</span></div>
+          <pre id="opt-json"></pre>
+        </div>
+      </div>
+      <div class="reduction-banner">−97% per event · nothing lost — full content stored once, referenced by hash</div>
+      <div class="wizard-actions">
+        <button class="btn ghost" onclick="show('connect')">← Back</button>
+        <button class="btn" onclick="show('deliver')">Continue →</button>
+      </div>
+    </section>
+
+    <!-- ============ WIZARD: DELIVER ============ -->
+    <section id="deliver" class="hidden">
+      <div class="steps">
+        <div class="step-pill done">1 · Connect ✓</div>
+        <div class="step-pill done">2 · Map ✓</div>
+        <div class="step-pill on">3 · Deliver</div>
+      </div>
+      <h2 class="screen-title">Where should your data go?</h2>
+      <p class="screen-sub">Your optimized data always lands in your own storage first — that's what you own. Add any destination on top.</p>
+      <div class="dest-list">
+        <div class="dest-row locked">
+          <div class="cb">✓</div>
+          <div class="info">
+            <h4>Rethread Data Platform <span class="lock">🔒 always on — this is what you own</span></h4>
+            <p>Lossless, session-structured, queryable archive in your own S3. Every byte recoverable.</p>
+          </div>
+          <div class="cost"><span class="good">~$2,000/mo storage</span></div>
+        </div>
+        <div class="dest-row" id="dest-datadog" onclick="toggleDest('datadog')">
+          <div class="cb"></div>
+          <div class="info">
+            <h4>Datadog — slim feed</h4>
+            <p>Metrics-only events. Your dashboards and alerts keep working, unchanged.</p>
+          </div>
+          <div class="cost"><span class="was">$72,000/mo today</span><span class="good">~$3,600/mo</span></div>
+        </div>
+        <div class="dest-row" id="dest-dynatrace" onclick="toggleDest('dynatrace')">
+          <div class="cb"></div>
+          <div class="info">
+            <h4>Dynatrace — slim feed</h4>
+            <p>Same slim feed, Dynatrace format.</p>
+          </div>
+          <div class="cost"><span class="good">~$3,100/mo</span></div>
+        </div>
+        <div class="dest-row" id="dest-s3" onclick="toggleDest('s3')">
+          <div class="cb"></div>
+          <div class="info">
+            <h4>Amazon S3 — raw archive</h4>
+            <p>Keep an untouched copy of the original raw logs, for compliance.</p>
+          </div>
+          <div class="cost"><span class="good">~$700/mo</span></div>
+        </div>
+      </div>
+      <div class="wizard-actions">
+        <button class="btn ghost" onclick="show('map')">← Back</button>
+        <button class="btn" onclick="buildPipeline()">Build pipeline ⚡</button>
+      </div>
+    </section>
+
+    <!-- ============ BUILDING ============ -->
+    <section id="building" class="hidden">
+      <h2 class="screen-title" id="build-title">Building your pipeline…</h2>
+      <div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
+      <p id="build-status">Provisioning ingestion queue…</p>
+    </section>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section id="dash" class="hidden">
+      <h2 class="screen-title">Dashboard</h2>
+      <p class="screen-sub">Pipeline <strong style="color:var(--green)">● bedrock-prod → Rethread + Datadog slim</strong> · running 30 days</p>
+      <div class="stat-row">
+        <div class="stat"><div class="label">Monthly savings</div><div class="value green">$61,400</div><div class="sub">was $72,000 → now $10,600</div></div>
+        <div class="stat"><div class="label">Data reduction</div><div class="value">94%</div><div class="sub">3 TB/day raw → 180 GB/day delivered</div></div>
+        <div class="stat"><div class="label">Sessions reconstructed</div><div class="value">41,203</div><div class="sub">this week · 98.7% match confidence</div></div>
+        <div class="stat"><div class="label">PII items tokenized</div><div class="value">12,882</div><div class="sub">reversible, vaulted under your KMS key</div></div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="panel">
+          <h3>Ingestion volume — raw vs optimized (30 days)</h3>
+          <div class="bars" id="volbars"></div>
+          <div class="legend">
+            <span><span class="dot" style="background:rgba(248,113,113,.55)"></span>Raw logs generated</span>
+            <span><span class="dot" style="background:var(--green)"></span>Delivered downstream</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Monthly cost — before vs after</h3>
+          <div class="hbar-row"><div class="name">Before Rethread</div><div class="hbar-track"><div class="hbar-fill" style="width:100%;background:rgba(248,113,113,.75)">$72,000</div></div></div>
+          <div class="hbar-row"><div class="name">After Rethread</div><div class="hbar-track"><div class="hbar-fill" style="width:15%;background:var(--green)">$10,600</div></div></div>
+          <p style="font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.6">After = Rethread fee $3,600 + compute $1,500 + S3 archive $2,000 + Datadog slim $3,600 (was $72k). You own 100% of the data either way — except now it's actually true.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>💬 Ask your data</h3>
+        <div class="ask-box">
+          <input type="text" placeholder="Ask anything about your AI usage…" onkeydown="if(event.key==='Enter')toast('Demo mode — try one of the suggested questions below')">
+          <button class="btn" onclick="toast('Demo mode — try one of the suggested questions below')">Ask</button>
+        </div>
+        <div class="chips">
+          <div class="chip" onclick="askQ(0)">Which application generates the most AI spend?</div>
+          <div class="chip" onclick="askQ(1)">Show me sessions where the agent got stuck in a loop</div>
+          <div class="chip" onclick="askQ(2)">How many tokens did we use last week, by model?</div>
+        </div>
+        <div id="ask-answer"></div>
+      </div>
+    </section>
+
+    <!-- ============ SESSIONS ============ -->
+    <section id="sess" class="hidden">
+      <h2 class="screen-title">Sessions</h2>
+      <p class="screen-sub">Every multi-step AI interaction, reconstructed from raw invocation logs into a readable story. Click one.</p>
+      <div class="panel" style="padding:0">
+        <table>
+          <thead><tr><th>Session</th><th>Application</th><th>Model</th><th>Steps</th><th>Tokens</th><th>Duration</th><th>Outcome</th></tr></thead>
+          <tbody id="sess-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ SESSION DETAIL ============ -->
+    <section id="sessdetail" class="hidden">
+      <span class="back-link" onclick="show('sess')">← All sessions</span>
+      <h2 class="screen-title">Session 7f3a · travel-booking-agent</h2>
+      <p class="screen-sub">Flight rebooking · claude-sonnet · 4 steps · 9,400 input tokens · 41s · <span class="flag warn">1 retry loop caught</span></p>
+      <div class="timeline">
+        <div class="t-step">
+          <h4>Step 1 — Customer asks to rebook flight</h4>
+          <p>System prompt + a 2 MB itinerary PDF attached. Both stored once, referenced by hash from here on — the PDF never bloats another event again. Customer name and booking reference tokenized into the PII vault.</p>
+          <div class="meta"><span>tool: search_flights</span><span>2,150 tokens in</span><span>blobs: S1, P1 stored</span></div>
+        </div>
+        <div class="t-step">
+          <h4>Step 2 — Agent searches flights, starts booking</h4>
+          <p>History re-sent by the app (that's how LLMs work) — but PDF and prompt already exist, so we store nothing twice. 15 KB flight-search result stored once.</p>
+          <div class="meta"><span>tool_result: search_flights</span><span>tool: book_flight</span><span>blobs: T1 stored</span></div>
+        </div>
+        <div class="t-step warn">
+          <h4>Step 3 — Booking fails, agent retries identically ⚠️</h4>
+          <p>Same tool, same arguments, back to back — flagged <strong>loop_suspected</strong> automatically. This is the kind of stuck-agent behavior that silently burns tokens and is invisible in raw logs.</p>
+          <div class="meta"><span>tool: book_flight (retry)</span><span>flag: loop_suspected</span></div>
+        </div>
+        <div class="t-step">
+          <h4>Step 4 — Booking succeeds, session complete ✓</h4>
+          <p>Outcome: completed. The whole story: 4 steps, 2 tools, 1 retry, 41 seconds.</p>
+          <div class="meta"><span>stop: end_turn</span><span>outcome: completed</span></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:26px">
+        <h3>What the observability vendor would have ingested without Rethread</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.7">~8.3 MB — the PDF re-sent on every call plus ever-growing history. <strong style="color:var(--text)">What Rethread delivered: ~10 KB of slim events</strong> + 2 MB of content stored exactly once in your own bucket. Same information, <strong style="color:var(--green)">99.8% less ingestion</strong>.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ---------- fake data ----------
+const RAW_JSON = `{
+  <span class="k">"schemaType"</span>: <span class="s">"ModelInvocationLog"</span>,
+  <span class="k">"schemaVersion"</span>: <span class="s">"1.0"</span>,
+  <span class="k">"timestamp"</span>: <span class="s">"2026-09-24T08:14:02Z"</span>,
+  <span class="k">"accountId"</span>: <span class="s">"123456789012"</span>,
+  <span class="k">"identity"</span>: { <span class="k">"arn"</span>: <span class="s">"arn:aws:sts::1234...:assumed-role/travel-agent-prod/i-0a1b"</span> },
+  <span class="k">"region"</span>: <span class="s">"us-east-1"</span>,
+  <span class="k">"requestId"</span>: <span class="s">"b6d8a1f0-3e2c-47d1-9c5a-88f0e2d91c44"</span>,
+  <span class="k">"operation"</span>: <span class="s">"Converse"</span>,
+  <span class="k">"modelId"</span>: <span class="s">"anthropic.claude-sonnet-4-20250514-v1:0"</span>,
+  <span class="k">"input"</span>: {
+    <span class="k">"inputContentType"</span>: <span class="s">"application/json"</span>,
+    <span class="k">"inputBodyJson"</span>: {
+      <span class="k">"system"</span>: <span class="s">"You are a travel booking assistant. Follow these 47 rules... [3.2 KB of system prompt, re-sent on EVERY call]"</span>,
+      <span class="k">"messages"</span>: [
+        { <span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: [
+          { <span class="k">"text"</span>: <span class="s">"Please rebook my flight..."</span> },
+          { <span class="k">"document"</span>: { <span class="k">"name"</span>: <span class="s">"itinerary.pdf"</span>,
+            <span class="k">"bytes"</span>: <span class="s">"JVBERi0xLjQKJcOkw7zDtsO8CjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSL0ZpbHRlci9GbGF0ZURlY29kZT4+CnN0cmVhbQp4nK1cS4/juBG+... [2 MB base64, re-sent on EVERY call]"</span> } }
+        ]},
+        { <span class="k">"role"</span>: <span class="s">"assistant"</span>, <span class="k">"content"</span>: <span class="s">"[full history of every prior turn, re-sent...]"</span> },
+        { <span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: <span class="s">"[...grows with every step]"</span> }
+      ],
+      <span class="k">"inferenceConfig"</span>: { <span class="k">"maxTokens"</span>: <span class="n">4096</span>, <span class="k">"temperature"</span>: <span class="n">0.7</span>, <span class="k">"topP"</span>: <span class="n">0.9</span> }
+    }
+  },
+  <span class="k">"output"</span>: {
+    <span class="k">"outputContentType"</span>: <span class="s">"application/json"</span>,
+    <span class="k">"outputBodyJson"</span>: {
+      <span class="k">"message"</span>: { <span class="k">"role"</span>: <span class="s">"assistant"</span>, <span class="k">"content"</span>: [
+        { <span class="k">"toolUse"</span>: { <span class="k">"toolUseId"</span>: <span class="s">"tu_01"</span>, <span class="k">"name"</span>: <span class="s">"search_flights"</span>,
+          <span class="k">"input"</span>: { <span class="k">"from"</span>: <span class="s">"FRA"</span>, <span class="k">"to"</span>: <span class="s">"LIS"</span>, <span class="k">"date"</span>: <span class="s">"2026-09-26"</span> } } }
+      ]},
+      <span class="k">"usage"</span>: { <span class="k">"inputTokens"</span>: <span class="n">2150</span>, <span class="k">"outputTokens"</span>: <span class="n">184</span> },
+      <span class="k">"stopReason"</span>: <span class="s">"tool_use"</span>, <span class="k">"metrics"</span>: { <span class="k">"latencyMs"</span>: <span class="n">2841</span> }
+    }
+  },
+  <span class="k">"...plus"</span>: <span class="s">"kubernetes metadata, trace context, container labels, debug fields ×30"</span>
+}`;
+
+const OPT_JSON = `{
+  <span class="k">"session_id"</span>: <span class="s">"7f3a"</span>,
+  <span class="k">"step_no"</span>: <span class="n">1</span>,
+  <span class="k">"workspace"</span>: <span class="s">"travel-prod"</span>,
+  <span class="k">"app_id"</span>: <span class="s">"travel-booking-agent"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"claude-sonnet-4"</span>,
+  <span class="k">"identity"</span>: <span class="s">"role/travel-agent-prod"</span>,
+  <span class="k">"ts"</span>: <span class="s">"2026-09-24T08:14:02Z"</span>,
+  <span class="k">"latency_ms"</span>: <span class="n">2841</span>,
+  <span class="k">"input_tokens"</span>: <span class="n">2150</span>,
+  <span class="k">"output_tokens"</span>: <span class="n">184</span>,
+  <span class="k">"stop_reason"</span>: <span class="s">"tool_use"</span>,
+  <span class="k">"tool_calls"</span>: [{ <span class="k">"name"</span>: <span class="s">"search_flights"</span> }],
+  <span class="k">"flags"</span>: [<span class="s">"pii_scrubbed"</span>],
+  <span class="k">"system_prompt_hash"</span>: <span class="s">"sha256:9f2c…"</span>,
+  <span class="k">"prompt_hash"</span>: <span class="s">"sha256:a41d…"</span>,
+  <span class="k">"response_hash"</span>: <span class="s">"sha256:77be…"</span>
+}
+
+<span style="color:#5b6776">// Full content? Stored ONCE in your bucket,</span>
+<span style="color:#5b6776">// retrievable by hash. Nothing was lost.</span>`;
+
+const SESSIONS = [
+  ["7f3a","travel-booking-agent","claude-sonnet-4","4","9,400","41s",["warn","1 retry · completed"]],
+  ["c21e","support-copilot","claude-haiku","12","31,800","3m 12s",["ok","completed"]],
+  ["9d04","invoice-extractor","nova-pro","2","4,100","8s",["ok","completed"]],
+  ["e8b7","support-copilot","claude-sonnet-4","27","94,600","11m 3s",["err","loop · abandoned"]],
+  ["44f1","code-review-bot","claude-sonnet-4","6","22,750","1m 44s",["ok","completed"]],
+  ["b3a9","travel-booking-agent","claude-sonnet-4","3","6,900","29s",["ok","completed"]],
+  ["1c6d","invoice-extractor","nova-pro","2","3,850","7s",["ok","completed"]],
+  ["f07b","support-copilot","claude-haiku","9","24,300","2m 30s",["warn","truncated · completed"]],
+];
+
+const ANSWERS = [
+  {
+    text: `<strong>support-copilot</strong> is your biggest spender — <strong>$4,120 last week (48%)</strong>, driven by long sessions (avg 11 steps) and history re-sent on every step. travel-booking-agent is second at $2,240 (26%). One session (e8b7) alone burned $310 in a 27-step loop before being abandoned.`,
+    bars: [["support-copilot",100,"$4,120"],["travel-booking",54,"$2,240"],["code-review-bot",31,"$1,290"],["invoice-extractor",13,"$540"]]
+  },
+  {
+    text: `Found <strong>14 sessions flagged loop_suspected this week</strong>. Worst: session <strong>e8b7</strong> (support-copilot) — the agent retried <code>lookup_order</code> with identical arguments 19 times over 11 minutes, burning 94,600 tokens before the user gave up. These loops are invisible in raw logs; they surface here because we reconstruct the session.`,
+    bars: [["Mon",30,"2"],["Tue",15,"1"],["Wed",45,"3"],["Thu",60,"4"],["Fri",30,"2"],["Sat",15,"1"],["Sun",15,"1"]]
+  },
+  {
+    text: `Last week: <strong>212M input + 9.4M output tokens</strong> across 4 models. claude-sonnet-4 dominates input volume (168M — history re-sending is 71% of it, which is exactly the waste Rethread's dedup makes visible). nova-pro is your cheapest per session.`,
+    bars: [["sonnet-4",100,"168M"],["haiku",22,"37M"],["nova-pro",4,"6.6M"],["other",1,"0.4M"]]
+  }
+];
+
+// ---------- navigation ----------
+const SCREENS = ["home","connect","map","deliver","building","dash","sess","sessdetail"];
+let pipelineBuilt = false;
+function show(id){
+  SCREENS.forEach(s=>document.getElementById(s).classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+  document.getElementById("nav-home").className = (["home","connect","map","deliver","building"].includes(id))?"active":"";
+  document.getElementById("nav-dash").className = id==="dash"?"active":"";
+  document.getElementById("nav-sess").className = (id==="sess"||id==="sessdetail")?"active":"";
+  window.scrollTo(0,0);
+}
+function enterApp(){ document.getElementById("login").style.display="none"; document.getElementById("app").style.display="block"; }
+function startWizard(){ show("connect"); }
+function guardDash(){ pipelineBuilt ? show("dash") : (show("connect"), toast("Set up a pipeline first — it takes 3 clicks")); }
+function guardSess(){ pipelineBuilt ? show("sess") : (show("connect"), toast("Set up a pipeline first — it takes 3 clicks")); }
+
+// ---------- wizard ----------
+function selectSource(s){
+  ["bedrock","cloudwatch","datadog","dynatrace"].forEach(x=>{
+    const el=document.getElementById("src-"+x);
+    el.classList.remove("selected");
+    const b=el.querySelector(".badge.ok"); if(b) b.remove();
+  });
+  const el=document.getElementById("src-"+s);
+  el.classList.add("selected");
+  const ok=document.createElement("span"); ok.className="badge ok"; ok.textContent="Connected ✓";
+  el.appendChild(ok);
+  const next=document.getElementById("connect-next");
+  next.disabled=false; next.style.opacity=1;
+}
+function toggleDest(d){ document.getElementById("dest-"+d).classList.toggle("checked"); }
+
+function buildPipeline(){
+  show("building");
+  const fill=document.getElementById("pfill"), status=document.getElementById("build-status");
+  const stages=[["Provisioning ingestion queue…",25],["Applying Standard Template mapping…",55],["Connecting delivery destinations…",80],["Backfilling last 24 hours…",100]];
+  let i=0;
+  const tick=()=>{
+    if(i<stages.length){ status.textContent=stages[i][0]; fill.style.width=stages[i][1]+"%"; i++; setTimeout(tick,750); }
+    else {
+      document.getElementById("build-title").innerHTML="✅ Pipeline live";
+      status.innerHTML="Your data is flowing. First optimized events already delivered.";
+      pipelineBuilt=true;
+      setTimeout(()=>show("dash"),1200);
+    }
+  };
+  tick();
+}
+
+// ---------- dashboard ----------
+function renderVolBars(){
+  const c=document.getElementById("volbars");
+  for(let i=0;i<30;i++){
+    const raw=70+Math.sin(i/4)*18+Math.random()*12;
+    const opt=raw*0.06;
+    const d=document.createElement("div"); d.className="bar-pair";
+    d.innerHTML=`<div class="bar-raw" style="height:${raw}%"></div><div class="bar-opt" style="height:${Math.max(opt,3)}%"></div>`;
+    c.appendChild(d);
+  }
+}
+function askQ(i){
+  const a=ANSWERS[i];
+  const bars=a.bars.map(b=>`<div class="mb" style="height:${b[1]}%"><span>${b[2]}</span><em>${b[0]}</em></div>`).join("");
+  document.getElementById("ask-answer").innerHTML=`<div class="answer">${a.text}<div class="mini-bars" style="margin-bottom:24px">${bars}</div></div>`;
+}
+
+// ---------- sessions ----------
+function renderSessions(){
+  const tb=document.getElementById("sess-rows");
+  tb.innerHTML=SESSIONS.map(s=>`<tr onclick="show('sessdetail')">
+    <td style="font-family:monospace;color:var(--accent)">${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td>
+    <td>${s[3]}</td><td>${s[4]}</td><td>${s[5]}</td>
+    <td><span class="flag ${s[6][0]}">${s[6][1]}</span></td></tr>`).join("");
+}
+
+// ---------- misc ----------
+function toast(msg){
+  const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
+}
+
+document.getElementById("raw-json").innerHTML=RAW_JSON;
+document.getElementById("opt-json").innerHTML=OPT_JSON;
+renderVolBars(); renderSessions();
+</script>
+</body>
+</html>
