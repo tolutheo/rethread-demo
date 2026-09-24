@@ -212,6 +212,18 @@
 
   .toast { position: fixed; bottom: 22px; right: 22px; background: var(--surface); border: 1px solid var(--amber-bd); border-radius: 10px; padding: 13px 18px; font-size: 13px; z-index: 100; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
   .conv-actions { display: flex; gap: 8px; }
+
+  /* ============ ask your data ============ */
+  .ask-box { display: flex; gap: 10px; margin-bottom: 14px; }
+  .ask-box input { flex: 1; padding: 12px 15px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13.5px; font-family: inherit; }
+  .chips { display: flex; gap: 9px; flex-wrap: wrap; }
+  .chip { padding: 8px 14px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface2); font-size: 12.5px; color: var(--text); cursor: pointer; transition: border-color .15s; }
+  .chip:hover { border-color: var(--accent); }
+  .answer { margin-top: 16px; padding: 17px; background: var(--surface2); border-radius: 10px; border-left: 3px solid var(--accent); font-size: 13.5px; line-height: 1.65; }
+  .answer .mini-bars { display: flex; align-items: flex-end; gap: 12px; height: 88px; margin-top: 16px; margin-bottom: 24px; }
+  .answer .mini-bars .mb { background: var(--accent); border-radius: 4px 4px 0 0; width: 52px; position: relative; }
+  .answer .mini-bars .mb span { position: absolute; top: -19px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--muted); white-space: nowrap; font-family: 'IBM Plex Mono', monospace; }
+  .answer .mini-bars .mb em { position: absolute; bottom: -19px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); font-style: normal; white-space: nowrap; }
 </style>
 </head>
 <body data-theme="teal">
@@ -377,6 +389,67 @@ function download(name, text){
   toast(`Downloaded ${name} (mock data)`);
 }
 
+/* ================= ask your data ================= */
+const ASK = {
+cx: [
+  { q:"Which agent frustrates customers the most?",
+    a:`<b>support-copilot</b> — it accounts for <b>82% of negative feedback</b> this week. Two drivers: retry loops (14 sessions, customers repeat themselves while the agent re-runs the same lookup) and truncated answers (7 conversations where the reply cut off mid-sentence and the customer had to re-ask). travel-booking-agent, after last week's fix, generates almost none. <span class="rc-link" onclick="openSession('e8b7')">Worst loop session →</span>`,
+    bars:[["support-copilot",100,"82%"],["travel-booking",13,"11%"],["invoice-extractor",5,"4%"],["other",4,"3%"]] },
+  { q:"What are customers asking that our agents can't answer?",
+    a:`Top unanswered intents this week: <b>"cancel my subscription"</b> (agent has no cancellation tool — 240 escalations), <b>"talk to a human"</b> honored but after avg 2.1 extra turns, and <b>invoice disputes over $500</b> (policy-blocked, correctly escalated). The first one is your biggest deflection opportunity: adding a cancellation tool would lift deflection an estimated 5 points.`,
+    bars:[["cancel sub",100,"240"],["human req",62,"148"],["disputes",39,"93"],["refund status",28,"67"]] },
+  { q:"Did CSAT improve after the travel agent fix?",
+    a:`Yes — clearly. travel-booking-agent CSAT went from <b>4.1 → 4.6</b> in the two weeks since the tool-retry fix shipped, a 6-month high. Escalations halved (8.9% → 4.1%). The before/after is visible per session because every session is reconstructed and timestamped against the deploy.`,
+    bars:[["wk -2",68,"4.1"],["wk -1",72,"4.2"],["deploy",78,"4.4"],["wk +1",85,"4.5"],["wk +2",92,"4.6"]] },
+],
+fin: [
+  { q:"What did Rethread save us this month?",
+    a:`<b>$61,400 in September.</b> Observability spend fell from $72,000 to $10,600 all-in (Rethread fee $3,600 + compute $1,500 + S3 archive $2,000 + Datadog slim feed $3,600). On top of that, loop detection flagged ~$310/week of pure token waste — small today, but it compounds as usage grows. Savings statement is exportable under Reports.`,
+    bars:[["Before",100,"$72k"],["After",15,"$10.6k"]] },
+  { q:"Which application is our biggest AI spender?",
+    a:`<b>support-copilot: $4,120/week (48%)</b> — driven by long sessions (avg 11 steps) and history re-sent on every step. travel-booking-agent is second at $2,240 (26%). One session (e8b7) alone burned $310 in a 27-step loop before being abandoned — that's the kind of line item that's invisible without session reconstruction.`,
+    bars:[["support-copilot",100,"$4,120"],["travel-booking",54,"$2,240"],["code-review",31,"$1,290"],["invoice-ext",13,"$540"]] },
+  { q:"How much are we paying for re-sent history?",
+    a:`<b>71% of support-copilot's input tokens are re-sent conversation history</b> — content the model has already seen, billed again every step. Across all apps that's ~$2,700/week of structural spend. You can't eliminate it (that's how LLMs work) but it's exactly what Rethread dedups out of your observability bill: it's stored once, not ingested 27 times.`,
+    bars:[["support-copilot",71,"71%"],["travel-booking",44,"44%"],["code-review",29,"29%"],["invoice-ext",8,"8%"]] },
+],
+eng: [
+  { q:"Show me sessions where the agent got stuck in a loop",
+    a:`<b>14 sessions flagged loop_suspected this week.</b> Worst: <b>e8b7</b> (support-copilot) — <code>lookup_order</code> retried with identical arguments 19× over 11 minutes, 94,600 tokens, then abandoned by the user. Detection is structural: same tool + same argument hash on consecutive steps. <span class="rc-link" onclick="openSession('e8b7')">Open e8b7 →</span>`,
+    bars:[["Mon",30,"2"],["Tue",15,"1"],["Wed",45,"3"],["Thu",60,"4"],["Fri",30,"2"],["Sat",15,"1"],["Sun",15,"1"]] },
+  { q:"Which prompt version is causing truncations?",
+    a:`<b>System prompt v41</b> (hash 9f2c…, deployed Tuesday) correlates with a <b>3.1× truncation spike</b> on claude-haiku — it added ~1.2k tokens of instructions, pushing long answers past max_tokens. v40 sessions show baseline truncation. Because prompts are content-addressed, the A/B falls out of the data without reading a single transcript. Rollback or raise max_tokens.`,
+    bars:[["v39",18,"0.9%"],["v40",20,"1.0%"],["v41",100,"3.1%"]] },
+  { q:"What's our dedup ratio this week?",
+    a:`<b>94.2% byte reduction</b> before compression (3.1 TB/day raw → 180 GB/day delivered). Blob dedup is doing the heavy lifting: 41% of incoming bytes were content already stored (re-sent PDFs, system prompts, history). Session match confidence is 98.7%; the 1.3% remainder is apps that trim history mid-session — Deep tier settles those.`,
+    bars:[["blobs deduped",100,"41%"],["history stripped",73,"30%"],["metadata dropped",56,"23%"],["delivered",15,"6%"]] },
+],
+ops: [
+  { q:"Which conversations need a human right now?",
+    a:`<b>3 conversations are stuck right now.</b> Most urgent: customer #4471 (cv-8812) — 11 minutes in a refund loop, agent retried the same lookup 19×. The other two are truncation re-asks. All three have root-cause traces one click away, so the human who takes over sees exactly what happened. <span class="rc-link" onclick="openSession('e8b7')">Trace cv-8812 →</span>`,
+    bars:[["stuck now",100,"3"],["watch",60,"9"],["healthy",40,"206"]] },
+  { q:"What's the top root cause of escalations this week?",
+    a:`<b>Agent loops — 38% of escalations</b>, all traceable to <code>lookup_order</code> retry behavior in support-copilot (ticket TK-2041 open with platform-eng). Second: truncated answers after prompt v41 (24%, TK-2038). Third: genuine policy escalations (disputes >$500) working as designed. The first two are fixable engineering issues, not staffing issues.`,
+    bars:[["loops",100,"38%"],["truncation",63,"24%"],["policy (by design)",47,"18%"],["other",53,"20%"]] },
+  { q:"How quickly are stuck sessions being caught?",
+    a:`Median <b>4.2 minutes from first repeated tool call to flag</b> — the loop flag fires on the second identical retry, and the live tier processes events within seconds. The 11-minute worst case (e8b7) predates the alert wiring; with alerts on, a human would have been paged at minute 2. That's the difference between a annoyed customer and an abandoned one.`,
+    bars:[["p50",42,"4.2m"],["p90",71,"7.1m"],["worst (pre-alert)",100,"11m"]] },
+],
+};
+function askPanel(){
+  const P = ASK[persona];
+  return `<div class="panel"><h3>💬 Ask your data</h3>
+    <div class="ask-box"><input placeholder="Ask anything about your AI operations…" onkeydown="if(event.key==='Enter')toast('Demo mode — try a suggested question below')"><button class="btn" onclick="toast('Demo mode — try a suggested question below')">Ask</button></div>
+    <div class="chips">${P.map((x,i)=>`<div class="chip" onclick="askQ(${i})">${x.q}</div>`).join("")}</div>
+    <div id="ask-answer"></div></div>`;
+}
+function askQ(i){
+  const a = ASK[persona][i];
+  const bars = a.bars.map(b=>`<div class="mb" style="height:${b[1]}%"><span>${b[2]}</span><em>${b[0]}</em></div>`).join("");
+  $("ask-answer").innerHTML = `<div class="answer">${a.a}<div class="mini-bars">${bars}</div></div>`;
+  $("ask-answer").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
 /* ================= session detail (shared) ================= */
 function openSession(id){
   if(persona==="ops"||persona==="cx"){ document.body.dataset.theme="teal"; persona="eng"; enterPersonaSilently(); }
@@ -416,7 +489,7 @@ cx: {
         <div class="al"><span class="dot2" style="background:var(--amber)"></span><div><b>Truncated answers spiking</b><p>Customers re-asking after cut-off replies on haiku.</p></div><span class="when">9h</span></div>
         <div class="al"><span class="dot2" style="background:var(--green)"></span><div><b>Travel agent CSAT at 6-month high</b><p>4.6 after the tool-retry fix shipped.</p></div><span class="when">1d</span></div>
       </div></div>
-    </div>`;
+    </div>` + askPanel();
   },
   agents(){ $("content").innerHTML =
     head("Agents","Every customer-facing AI agent, at a glance",`<div class="filters"><select onchange="globalFilter(this.value==='All teams'?'':this.value)"><option>All teams</option><option>Support</option><option>Travel</option><option>Finance Ops</option><option>Eng Prod</option></select></div>`) +
@@ -455,7 +528,7 @@ fin: {
       <div class="panel"><h3>Monthly cost — before vs after Rethread</h3>${hbars([["Before",100,"$72,000","var(--rose)"],["After",15,"$10,600","var(--green)"]])}
         <p style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6">After = Rethread fee $3,600 + compute $1,500 + S3 archive $2,000 + Datadog slim $3,600. You own 100% of the data.</p></div>
       <div class="panel"><h3>Ingestion volume (30 days)</h3>${volChart()}</div>
-    </div>`;
+    </div>` + askPanel();
   },
   costs(){ $("content").innerHTML =
     head("Cost breakdown","Where AI spend goes, by application",`<div class="filters"><select><option>September 2026</option><option>August 2026</option></select></div>`) +
@@ -488,7 +561,7 @@ eng: {
       <div class="panel"><h3>Raw vs delivered volume (30d)</h3>${volChart()}</div>
       <div class="panel"><h3>Open incidents</h3><div class="alert-list">${INCIDENTS.map(i=>`
         <div class="al"><span class="dot2" style="background:var(--${i.sev==='err'?'rose':i.sev==='warn'?'amber':'green'})"></span><div><b>${i.id} · ${i.title}</b><p>${i.body} ${i.sess?`<span class="rc-link" onclick="openSession('${i.sess}')">Session →</span>`:''}</p></div><span class="when">${i.when}</span></div>`).join("")}</div></div>
-    </div>`;
+    </div>` + askPanel();
   },
   sessions(){ $("content").innerHTML =
     head("Session Explorer","Every multi-step interaction, reconstructed. Search or click a row.",`<div class="filters"><select onchange="globalFilter(this.value.startsWith('All')?'':this.value)"><option>All outcomes</option><option>completed</option><option>loop</option><option>truncated</option></select></div>`) +
@@ -518,7 +591,7 @@ ops: {
     `<div class="panel"><h3>Needs attention — root causes one click away</h3><div class="alert-list">
       <div class="al"><span class="dot2" style="background:var(--rose)"></span><div><b>customer #4471 stuck in refund loop</b><p>support-copilot retried lookup_order 19×. <span class="rc-link" onclick="openSession('e8b7')">Root cause: session e8b7 →</span></p></div><span class="when">now</span></div>
       <div class="al"><span class="dot2" style="background:var(--amber)"></span><div><b>Truncated answers causing re-asks</b><p>7 conversations today. <span class="rc-link" onclick="openSession('f07b')">Example session →</span></p></div><span class="when">1h</span></div>
-    </div></div>`;
+    </div></div>` + askPanel();
   },
   conversations(){ $("content").innerHTML =
     head("Conversations","AI-handled conversations with actions",`<div class="filters"><select onchange="globalFilter(this.value.startsWith('All')?'':this.value)"><option>All agents</option><option>support-copilot</option><option>travel-booking-agent</option></select></div>`) +
